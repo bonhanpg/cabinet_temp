@@ -1,0 +1,131 @@
+#include <DHTesp.h>
+
+
+// Libraries to use on RTC DS1307 - I2C conection
+#include <DS1307RTC.h>        // RTC1307
+#include <Wire.h>             // I2C
+#include <TimeLib.h>  
+#include <RTClib.h>
+#include <SD.h>
+#include <SPI.h>
+
+#define DHTPIN_PLA    5
+#define DHTPIN_MET    6
+#define DHTPIN_EXT    7
+#define LED_SHIELD    4
+        
+RTC_DS1307 rtc;
+//DHT dht(DHTPIN, DHTYPE); 
+//DHT2 dht(DHTPIN2, DHTYPE);
+DHTesp dht_plastico;
+DHTesp dht_metal;
+DHTesp dht_externo;
+
+File file;                  // ponteiro para arquivo
+const int Pino_CS = 10;
+
+void setup() {
+  // Serial
+  Serial.begin(9600);
+  dht_plastico.setup(DHTPIN_PLA, DHTesp::DHT11);
+  dht_metal.setup(DHTPIN_MET,DHTesp::DHT11);
+  dht_externo.setup(DHTPIN_EXT,DHTesp::DHT11);
+
+   pinMode(LED_SHIELD, OUTPUT);
+  
+  rtc.begin();
+  //dht.begin();
+  Wire.begin();
+  
+  //Verifica as condicoes do RTC  
+  if (! rtc.begin()){
+    Serial.println("RTC nao encontrado!");
+    while (1);  
+  }  
+//    if (! rtc.isrunning()){
+//      Serial.println("RTC nao operante!");
+//      A linha abaixo ajusta o RTC com a data e hora do momento da compilacao
+//      rtc.adjust(DateTime(F(__DATE__), F(__TIME__)));    
+    //  A linha abaixo permite ajustar manualmente a data e hora do RTC
+   //   Formato: DateTime(ano, mes, dia, hora, minuto, segundo)    
+      rtc.adjust(DateTime(2020, 01, 22, 12, 39, 0));  //aqui ajustar para data e horário que inicia}
+  
+  // Cartão 
+  Serial.println("Iniciando cartao SD...");
+  if (!SD.begin(Pino_CS))  {
+    Serial.println("Falha na inicializacao do SD!");
+    return;  }
+  Serial.println("Cartao SD iniciado. OK");  
+  Serial.println();
+
+// cabeçalho
+  file = SD.open("data.log", FILE_WRITE);
+    file.println("date-time, temp_pla, umid_pla, temp_met, umid_met, temp_ext, umid_ext");
+    file.close();
+
+}
+
+
+void loop() {
+  //dht
+  /*float h = dht.readHumidity();
+  float t = dht.readTemperature();
+ */
+  //DHT.read11(DHTPIN);
+
+    float h_plastico = dht_plastico.getHumidity();
+    float t_plastico = dht_plastico.getTemperature();
+
+    float h_metal = dht_metal.getHumidity();
+    float t_metal = dht_metal.getTemperature();
+
+    float h_externo = dht_externo.getHumidity();
+    float t_externo = dht_externo.getTemperature();
+    
+  
+  if (isnan(t_plastico) || isnan(h_plastico) || isnan(t_metal) || isnan(h_metal) || isnan(t_externo) || isnan(h_externo)) {
+    Serial.println("Failed to read from DHT");
+  } 
+  
+  tmElements_t tm;
+  String dataString = "";
+  if (RTC.read(tm)) {
+    dataString += tmYearToCalendar(tm.Year);
+    dataString += '-';
+    dataString += tm.Month;
+    dataString += '-';
+    dataString += tm.Day;
+    dataString += ' ';
+    dataString += tm.Hour;
+    dataString += ':';
+    dataString += tm.Minute;
+    dataString += ':';
+    dataString += tm.Second;
+    dataString += ',';
+    dataString += t_plastico;
+    dataString += ',';
+    dataString += h_plastico;
+    dataString += ',';
+    dataString += t_metal;
+    dataString += ',';
+    dataString += h_metal;
+    dataString += ',';
+    dataString += t_externo;
+    dataString += ',';
+    dataString += h_externo;
+    
+    Serial.println(dataString);
+    
+    digitalWrite(LED_SHIELD, HIGH);
+    delay(1000*3);
+    file = SD.open("data.log", FILE_WRITE);
+    file.println(dataString);
+    file.close();
+    delay(1000*2);
+    digitalWrite(LED_SHIELD, LOW);
+    
+    delay(300000);
+  //Serial.println("Done.");
+    //delay(2000);
+  }
+}
